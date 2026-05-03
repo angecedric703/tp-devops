@@ -1,0 +1,42 @@
+---
+- name: Installation de k3s
+  hosts: k3s
+  become: true
+
+  tasks:
+    - name: Installation de curl
+      apt:
+        name: curl
+        state: present
+        update_cache: true
+
+    - name: Vérification si k3s est déjà installé
+      command: k3s --version
+      register: k3s_installed
+      failed_when: false
+      changed_when: false
+
+    - name: Installation de k3s
+      shell: curl -sfL https://get.k3s.io | sh -
+      when: k3s_installed.rc != 0
+
+    - name: Attente que k3s soit actif
+      systemd:
+        name: k3s
+        state: started
+        enabled: true
+
+    - name: Récupération du kubeconfig
+      fetch:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: ./kubeconfig.yaml
+        flat: true
+
+    - name: Vérification du cluster
+      command: k3s kubectl get nodes
+      register: nodes
+      changed_when: false
+
+    - name: Affichage des nodes
+      debug:
+        msg: "{{ nodes.stdout_lines }}"

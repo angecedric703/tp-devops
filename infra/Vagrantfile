@@ -1,17 +1,39 @@
 Vagrant.configure("2") do |config|
-  config.vm.box = "debian/bookworm64"
-  config.vm.hostname = "devops-k3s"
 
-  config.vm.network "private_network", ip: "192.168.56.10"
+  config.vm.define "k3s" do |k3s|
+    k3s.vm.box = "debian/bookworm64"
+    k3s.vm.hostname = "devops-k3s"
+    k3s.vm.network "private_network", ip: "192.168.56.10"
 
-  config.vm.provider "virtualbox" do |vb|
-    vb.name   = "devops-k3s"
-    vb.memory = 2048
-    vb.cpus   = 2
+    k3s.vm.provider "virtualbox" do |vb|
+      vb.name   = "devops-k3s"
+      vb.memory = 2048
+      vb.cpus   = 2
+    end
+
+    k3s.vm.provision "shell", inline: <<-SHELL
+      apt-get update -y
+      apt-get install -y python3 curl
+    SHELL
   end
 
-  config.vm.provision "shell", inline: <<-SHELL
-    apt-get update -y
-    apt-get install -y python3
-  SHELL
+  config.vm.define "monitoring" do |mon|
+    mon.vm.box = "debian/bookworm64"
+    mon.vm.hostname = "devops-monitoring"
+    mon.vm.network "private_network", ip: "192.168.56.11"
+    mon.vm.network "forwarded_port", guest: 3000, host: 3000
+    mon.vm.network "forwarded_port", guest: 9090, host: 9090
+
+    mon.vm.provider "virtualbox" do |vb|
+      vb.name   = "devops-monitoring"
+      vb.memory = 2048
+      vb.cpus   = 2
+    end
+
+    mon.vm.provision "shell", inline: <<-SHELL
+      apt-get update -y
+      apt-get install -y python3 curl
+    SHELL
+  end
+
 end

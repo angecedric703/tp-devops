@@ -1,0 +1,152 @@
+---
+- name: Installation de Node Exporter sur toutes les VMs
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Création de l'utilisateur node_exporter
+      user:
+        name: node_exporter
+        shell: /bin/false
+        system: true
+
+    - name: Téléchargement de Node Exporter
+      get_url:
+        url: https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz
+        dest: /tmp/node_exporter.tar.gz
+
+    - name: Extraction de Node Exporter
+      unarchive:
+        src: /tmp/node_exporter.tar.gz
+        dest: /tmp/
+        remote_src: true
+
+    - name: Copie du binaire
+      copy:
+        src: /tmp/node_exporter-1.7.0.linux-amd64/node_exporter
+        dest: /usr/local/bin/node_exporter
+        remote_src: true
+        mode: '0755'
+        owner: node_exporter
+
+    - name: Création du service systemd
+      copy:
+        dest: /etc/systemd/system/node_exporter.service
+        content: |
+          [Unit]
+          Description=Node Exporter
+          After=network.target
+
+          [Service]
+          User=node_exporter
+          ExecStart=/usr/local/bin/node_exporter
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Démarrage de Node Exporter
+      systemd:
+        name: node_exporter
+        state: started
+        enabled: true
+        daemon_reload: true
+
+- name: Installation de Prometheus et Grafana sur la VM monitoring
+  hosts: monitoring
+  become: true
+
+  tasks:
+    - name: Téléchargement de Prometheus
+      get_url:
+        url: https://github.com/prometheus/prometheus/releases/download/v2.50.0/prometheus-2.50.0.linux-amd64.tar.gz
+        dest: /tmp/prometheus.tar.gz
+
+    - name: Extraction de Prometheus
+      unarchive:
+        src: /tmp/prometheus.tar.gz
+        dest: /tmp/
+        remote_src: true
+
+    - name: Création des dossiers Prometheus
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+      loop:
+        - /etc/prometheus
+        - /var/lib/prometheus
+
+    - name: Copie des binaires Prometheus
+      copy:
+        src: "/tmp/prometheus-2.50.0.linux-amd64/{{ item }}"
+        dest: "/usr/local/bin/{{ item }}"
+        remote_src: true
+        mode: '0755'
+      loop:
+        - prometheus
+        - promtool
+
+    - name: Configuration de Prometheus
+      copy:
+        dest: /etc/prometheus/prometheus.yml
+        content: |
+          global:
+            scrape_interval: 15s
+
+          scrape_configs:
+            - job_name: 'k3s'
+              static_configs:
+                - targets: ['192.168.56.10:9100']
+                  labels:
+                    instance: 'devops-k3s'
+
+            - job_name: 'monitoring'
+              static_configs:
+                - targets: ['192.168.56.11:9100']
+                  labels:
+                    instance: 'devops-monitoring'
+
+    - name: Création du service Prometheus
+      copy:
+        dest: /etc/systemd/system/prometheus.service
+        content: |
+          [Unit]
+          Description=Prometheus
+          After=network.target
+
+          [Service]
+          ExecStart=/usr/local/bin/prometheus \
+            --config.file=/etc/prometheus/prometheus.yml \
+            --storage.tsdb.path=/var/lib/prometheus
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Démarrage de Prometheus
+      systemd:
+        name: prometheus
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: Ajout du repo Grafana
+      shell: |
+        apt-get install -y apt-transport-https software-properties-common wget
+        wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key
+        echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list
+        apt-get update -y
+      args:
+        creates: /etc/apt/sources.list.d/grafana.list
+
+    - name: Installation de Grafana
+      apt:
+        name: grafana
+        state: present
+        update_cache: true
+
+    - name: Démarrage de Grafana
+      systemd:
+        name: grafana-server
+        state: started
+        enabled: true

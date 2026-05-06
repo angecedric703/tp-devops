@@ -34,18 +34,31 @@ tp-devops/
 │   └── src/
 
 ├── infra/
+
 │   ├── Vagrantfile
+
 │   ├── hosts.ini
+
 │   ├── playbook.yml
+
 │   └── playbook_monitoring.yml
+
 ├── k8s/
+
 │   ├── secret.yaml
+
 │   ├── mysql-pvc.yaml
+
 │   ├── mysql-deployment.yaml
+
 │   ├── mysql-service.yaml
+
 │   ├── api-deployment.yaml
+
 │   ├── api-service.yaml
+
 │   └── api-hpa.yaml
+
 └── README.md
 
 ## Partie 1 — Infrastructure

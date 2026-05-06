@@ -24,10 +24,15 @@ export VAGRANT_WSL_ENABLE_WINDOWS_ACCESS="1"
 
 ## Arborescence
 tp-devops/
+
 ├── .github/workflows/cicd.yml
+
 ├── app/
+
 │   ├── Dockerfile
+
 │   └── src/
+
 ├── infra/
 │   ├── Vagrantfile
 │   ├── hosts.ini
